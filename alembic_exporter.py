@@ -91,7 +91,7 @@ def baker(objectNames, fileName):
     # Clean up after yourself
     for name in objectNames:
         bpy.data.objects[name].select_set(False)
-        include_collection(vl_collections, name)
+        exclude_collection(vl_collections, name)
 
 
 class BakeObj:
