@@ -102,7 +102,8 @@ def bake_object(object_name, file_name):
         evaluation_mode="VIEWPORT",
         apply_subdiv=True,
         export_hair=False,
-        export_particles=False
+        export_particles=False,
+        flatten=True
     )
 
     # Clean up after yourself
