@@ -5,8 +5,9 @@ bl_info = {
     "description": "batch exports alembics",
     "author": "augmero",
     "version": (0, 3),
-    "blender": (3, 0, 0),
-    "tracker_url": "https://augmero.github.io",
+    "blender": (3, 5, 1),
+    "tracker_url": "https://twitter.com/augmero_nsfw",
+    "doc_url": "https://github.com/augmero/blender-alembic-bulk-exporter",
     "support": "TESTING",
     "category": "Import-Export",
 }
@@ -20,7 +21,6 @@ bl_info = {
 #   Something was selected, I usually select one of my exports and then deselect to make sure it's clear
 #   Typo in the names of the exports
 #   blender doesn't like the mesh for some reason (try exporting from the normal UI and see if you get the same error)
-#   Alembic export doesn't like the rig and mesh parent/child relationship, clear parent and then add the armature back
 
 # This script uses manual data entry, not very user friendly I know
 # Important things to enter in:
@@ -35,28 +35,26 @@ scene = bpy.context.scene
 # startFrame = scene.frame_start
 # endFrame = scene.frame_end
 # comment out or remove the above 3 lines and set start and end frame manually if you want
-startFrame = 2
-endFrame = 120
+startFrame = 10
+endFrame = 300
 path = bpy.path.abspath("//")
 
 
 class BakeObj:
     def __init__(self, in1, in2):
-        self.obj_name = in1
-        self.file_name = in2
+        self.objName = in1
+        self.fileName = in2
 
 
 # This is the important one to change
 # First string is the name of the object (AND COLLECTION) in blender
 # IMPORTANT, HAVE OBJECTS SEPARATED INTO COLLECTIONS OF THE SAME NAME SO THEY CAN BE EXCLUDED FOR PERFORMANCE
-# Second string is whatever you want to call the file that will be exported
+# Example in blender would be like this
+#   z_plane
+#       z_plane
+# Second string in this list is whatever you want to call the file that will be exported
 bakeList = [
-    # BakeObj('z_bra', 'bra baked'),
-    # BakeObj('z_bone', 'bone baked'),
-    # BakeObj('z_tissue', 'tissue baked'),
-    # BakeObj('z_hands', 'hands baked'),
-    BakeObj('z_rhand', 'rhand baked'),
-    # BakeObj('z_waist', 'waist baked'),
+    BakeObj('z_plane', 'z_plane'),
 ]
 
 
@@ -64,77 +62,58 @@ bakeList = [
 def deselect():
     for obj in bpy.context.selected_objects:
         obj.select_set(False)
+    # bpy.ops.object.select_all(action='DESELECT')
 
 
 deselect()
 
+
 vl_collections = bpy.context.scene.view_layers["ViewLayer"].layer_collection
 
 
-def retrieve_layer_collection_BFS(layer_collection, collection_name):
-    layers = [l for l in layer_collection.children]
-    while len(layers) > 0:
-        layer = layers.pop(0)
-        if layer.name == collection_name:
-            print(f'BFS FOUND {collection_name}\n')
-            return layer
-        if layer.children and len(layer.children) > 0:
-            layers += layer.children
-    print(f'BFS DID NOT FIND {collection_name}\n')
-    return None
+def set_collection_exclude(p_collection, name, exclude):
+    for collection in p_collection.children:
+        if collection.name.lower() == name.lower():
+            print(f"COLLECTION FOUND| {name} |COLLECTION FOUND, setting exclude to {exclude}")
+            collection.exclude = exclude
+        elif collection.children:
+            set_collection_exclude(collection, name, exclude)
 
 
-def bake_object(object_name, file_name):
+def baker(objectNames, fileName):
     deselect()
-    object = bpy.data.objects.get(object_name)
-    if not object:
-        print(f'Object {object_name} doesn\'t exist, this should never happen')
-        return
-    object.select_set(True)
+    # Make sure the object is in viewport to bake
+    for name in objectNames:
+        set_collection_exclude(vl_collections, name, False)
+        bpy.data.objects[name].select_set(True)
 
     bpy.ops.wm.alembic_export(
-        filepath=path + file_name + ".abc",
+        filepath=path + fileName + ".abc",
         selected=True,
-        visible_objects_only=True,
         start=startFrame,
         end=endFrame,
         global_scale=100,
         evaluation_mode="VIEWPORT",
         apply_subdiv=True,
-        export_hair=False,
-        export_particles=False,
-        flatten=True
     )
 
     # Clean up after yourself
-    object.select_set(False)
+    for name in objectNames:
+        bpy.data.objects[name].select_set(False)
+        set_collection_exclude(vl_collections, name, True)
 
 
-layer_collections = {}
-
-# find collections mentioned in bake list
+# first hide all collections to be baked
 for bake in bakeList:
-    find_collection = retrieve_layer_collection_BFS(vl_collections, bake.obj_name)
-    if find_collection:
-        find_collection.exclude = False
-        object = bpy.data.objects.get(bake.obj_name)
-        if object:
-            layer_collections[bake.obj_name] = find_collection
-            find_collection.exclude = True
-        else:
-            print(f'Object {bake.obj_name} not found')
+    set_collection_exclude(vl_collections, bake.objName, True)
 
-# bake valid objects
+# export each alembic
 for bake in bakeList:
-    collection = layer_collections.get(bake.obj_name)
-    collection.exclude = False
-    object = bpy.data.objects.get(bake.obj_name)
-    if collection and object:
-        bake_object(bake.obj_name, bake.file_name)
-    collection.exclude = True
+    baker([bake.objName], bake.fileName)
 
-# include all collection in bake list
-for collection in layer_collections.values():
-    collection.exclude = False
+# show all collections that were baked
+for bake in bakeList:
+    set_collection_exclude(vl_collections, bake.objName, False)
+
 
 deselect()
