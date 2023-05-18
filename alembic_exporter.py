@@ -21,6 +21,7 @@ bl_info = {
 #   Something was selected, I usually select one of my exports and then deselect to make sure it's clear
 #   Typo in the names of the exports
 #   blender doesn't like the mesh for some reason (try exporting from the normal UI and see if you get the same error)
+#   Alembic export doesn't like the rig and mesh parent/child relationship, clear parent and then add the armature back
 
 # This script uses manual data entry, not very user friendly I know
 # Important things to enter in:
@@ -42,8 +43,8 @@ path = bpy.path.abspath("//")
 
 class BakeObj:
     def __init__(self, in1, in2):
-        self.objName = in1
-        self.fileName = in2
+        self.obj_name = in1
+        self.file_name = in2
 
 
 # This is the important one to change
@@ -80,15 +81,15 @@ def set_collection_exclude(p_collection, name, exclude):
             set_collection_exclude(collection, name, exclude)
 
 
-def baker(objectNames, fileName):
+def baker(object_names, file_name):
     deselect()
     # Make sure the object is in viewport to bake
-    for name in objectNames:
+    for name in object_names:
         set_collection_exclude(vl_collections, name, False)
         bpy.data.objects[name].select_set(True)
 
     bpy.ops.wm.alembic_export(
-        filepath=path + fileName + ".abc",
+        filepath=path + file_name + ".abc",
         selected=True,
         start=startFrame,
         end=endFrame,
@@ -98,22 +99,22 @@ def baker(objectNames, fileName):
     )
 
     # Clean up after yourself
-    for name in objectNames:
+    for name in object_names:
         bpy.data.objects[name].select_set(False)
         set_collection_exclude(vl_collections, name, True)
 
 
 # first hide all collections to be baked
 for bake in bakeList:
-    set_collection_exclude(vl_collections, bake.objName, True)
+    set_collection_exclude(vl_collections, bake.obj_name, True)
 
 # export each alembic
 for bake in bakeList:
-    baker([bake.objName], bake.fileName)
+    baker([bake.obj_name], bake.file_name)
 
 # show all collections that were baked
 for bake in bakeList:
-    set_collection_exclude(vl_collections, bake.objName, False)
+    set_collection_exclude(vl_collections, bake.obj_name, False)
 
 
 deselect()
